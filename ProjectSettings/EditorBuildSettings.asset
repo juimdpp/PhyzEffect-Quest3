@@ -20,6 +20,12 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/MyAssets/MyScenes/SceneAligner.unity
     guid: 60965a7658c29b648ba6a5aebf8b5124
+  - enabled: 0
+    path: "Assets/Samples/Meta XR Interaction \u200BSDK/72.0.0/Feature Scenes/DebugRay.unity"
+    guid: 98733b7ba27575749b1cb1365c853e1f
+  - enabled: 0
+    path: "Assets/Samples/Meta XR Interaction \u200BSDK/72.0.0/Example Scenes/RayExamples.unity"
+    guid: 1b2d3f90c0f50b94cb910c66c773d00d
   m_configObjects:
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 34ef34a4b35d2634686dda53afd684c6,
       type: 2}

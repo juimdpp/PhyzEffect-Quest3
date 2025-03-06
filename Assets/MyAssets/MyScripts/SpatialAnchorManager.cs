@@ -7,24 +7,60 @@ using System;
 
 class AnchorPair
 {
-    public OVRSpatialAnchor topLeft;
-    public OVRSpatialAnchor btmRight;
+    public OVRSpatialAnchor topLeft = null;
+    public OVRSpatialAnchor btmRight = null;
+    public Vector3 normal = Vector3.negativeInfinity;
+    public int label = -1; // 0 = wall, 1 = floor, -1 = nothing
+    public const int WALL = 0;
+    public const int FLOOR = 1;
 
     int mostRecentIdx = -1; // 0 = Left, 1 = Right, -1 = nothing
     
+    
+    public void SetSurfaceType(int _label)
+    {
+        Debug.Log($"HYUNSOO: SetLabel {label}");
+        if (label == -1)
+        {
+            label = _label;
+        }
+        else if (label == -1 && label != _label)
+        {
+            Debug.Log($"Left and Right anchors have different labels... {label} != {_label}");
+        }
+    }
     public void SetLeftAnchor(OVRSpatialAnchor anchor)
     {
-        Debug.Log("HYUNSOO: setleftanchor begin");
         topLeft = anchor;
         mostRecentIdx = 0;
-        Debug.Log("HYUNSOO: setleftanchor end");
     }
     public void SetRightAnchor(OVRSpatialAnchor anchor)
     {
-        Debug.Log("HYUNSOO: setrightanchor begin");
         btmRight = anchor;
         mostRecentIdx = 1;
-        Debug.Log("HYUNSOO: setrightanchor end");
+    }
+
+    public void SetNormal(Vector3 _normal)
+    {
+        Debug.Log($"HYUNSOO: SetNormal {normal}");
+        if(normal == Vector3.negativeInfinity)
+        {
+            normal = _normal;
+        }
+        else if(normal != Vector3.negativeInfinity && normal != _normal)
+        {
+            Debug.Log($"Left and Right anchors have different normal... {normal} != {_normal}");
+        }
+    }
+
+    public void Reset()
+    {
+        // TODO
+        topLeft = null;
+        btmRight = null;
+        normal = Vector3.negativeInfinity;
+        label = -1;
+        mostRecentIdx = -1;
     }
 
     public Vector3 GetCenter()
@@ -39,7 +75,19 @@ class AnchorPair
 
     public float GetHeight()
     {
-        return Mathf.Abs(topLeft.transform.position.y - btmRight.transform.position.y);
+        if(label == WALL)
+        {
+            return Mathf.Abs(topLeft.transform.position.y - btmRight.transform.position.y);
+        }
+        else if(label == FLOOR)
+        {
+            return Mathf.Abs(topLeft.transform.position.z - btmRight.transform.position.z);
+        }
+        else
+        {
+            return -1;
+        }
+        
     }
 
     public void EraseRecentAnchor()
@@ -72,8 +120,7 @@ class AnchorPair
         }
         if(mostRecentIdx == -1)
         {
-            topLeft = null;
-            btmRight = null;
+            Reset();
         }
     }
 
@@ -86,12 +133,15 @@ class AnchorPair
 public class SpatialAnchorManager: MonoBehaviour
 {
     public GameObject leftAnchorPrefab;
+    public GameObject leftAnchorPreviewPrefab;
     public GameObject rightAnchorPrefab;
-    public GameObject surfacePrefab;
+    public GameObject rightAnchorPreviewPrefab;
+    public GameObject wallPrefab;
+    public GameObject floorPrefab;
     public TMP_Text console;
 
-    private OVRSpatialAnchor lastCreatedAnchor;
-    private TMP_Text savedStatusOfLastCreatedAnchor;
+    private GameObject leftPreviewAnchor;
+    private GameObject rightPreviewAnchor;
     private bool isInitialized = false;
 
     private AnchorPair anchorPair;
@@ -100,6 +150,8 @@ public class SpatialAnchorManager: MonoBehaviour
     void Start()
     {
         anchorPair = new AnchorPair();
+        leftPreviewAnchor = Instantiate(leftAnchorPreviewPrefab);
+        rightPreviewAnchor = Instantiate(rightAnchorPreviewPrefab);
     }
 
     // Update is called once per frame
@@ -108,36 +160,57 @@ public class SpatialAnchorManager: MonoBehaviour
         if (!isInitialized) return;
 
         // Create Ray
-        Vector3 rayOrigin = OVRInput.GetLocalControllerPosition(OVRInput.Controller.RTouch);
-        Vector3 rayDirection = OVRInput.GetLocalControllerRotation(OVRInput.Controller.RTouch) * Vector3.forward;
+        Vector3 leftRayOrigin = OVRInput.GetLocalControllerPosition(OVRInput.Controller.LTouch);
+        Vector3 leftRayDirection = OVRInput.GetLocalControllerRotation(OVRInput.Controller.LTouch) * Vector3.forward;
 
         // Check if it intersects with Scene API elements
-        if (MRUK.Instance.GetCurrentRoom().Raycast(new Ray(rayOrigin, rayDirection), float.MaxValue, out RaycastHit hit, out MRUKAnchor anchor))
+        if (MRUK.Instance.GetCurrentRoom().Raycast(new Ray(leftRayOrigin, leftRayDirection), float.MaxValue, out RaycastHit lHit, out MRUKAnchor lAnchor))
         {
-            if (anchor != null && OVRInput.GetDown(OVRInput.Button.PrimaryIndexTrigger)) // top left anchor creation
+            leftPreviewAnchor.transform.position = lHit.point;
+            leftPreviewAnchor.transform.rotation = Quaternion.FromToRotation(Vector3.up, lHit.normal);
+
+            if (lAnchor != null && OVRInput.GetDown(OVRInput.Button.PrimaryIndexTrigger)) // top left anchor creation
             {
-                Quaternion rotation = Quaternion.LookRotation(-hit.normal);
-                StartCoroutine(CreateSpatialAnchor(leftAnchorPrefab, hit.point, rotation, (createdAnchor) =>
+                Quaternion rotation = Quaternion.LookRotation(-lHit.normal);
+                StartCoroutine(CreateSpatialAnchor(leftAnchorPrefab, lHit.point, rotation, (createdAnchor) =>
                 {
                     anchorPair.SetLeftAnchor(createdAnchor);
-                    Log($"Check validity of anchor: {createdAnchor.Uuid}");
-                }));
-            }
-
-            if (anchor != null && OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger)) // btm right anchor creation
-            {
-                Quaternion rotation = Quaternion.LookRotation(-hit.normal);
-                StartCoroutine(CreateSpatialAnchor(rightAnchorPrefab, hit.point, rotation, (createdAnchor) =>
-                {
-                    anchorPair.SetRightAnchor(createdAnchor);
+                    anchorPair.SetNormal(MRUK.Instance.GetCurrentRoom().GetFacingDirection(lAnchor));
+                    anchorPair.SetSurfaceType(LabelToInt(lAnchor.Label));
                     Log($"Check validity of anchor: {createdAnchor.Uuid}");
                 }));
             }
         }
 
+        // Create Ray
+        Vector3 rightRayOrigin = OVRInput.GetLocalControllerPosition(OVRInput.Controller.RTouch);
+        Vector3 rightRayDirection = OVRInput.GetLocalControllerRotation(OVRInput.Controller.RTouch) * Vector3.forward;
+
+        // Check if it intersects with Scene API elements
+        if (MRUK.Instance.GetCurrentRoom().Raycast(new Ray(rightRayOrigin, rightRayDirection), float.MaxValue, out RaycastHit rHit, out MRUKAnchor rAnchor))
+        {
+            rightPreviewAnchor.transform.position = rHit.point;
+            rightPreviewAnchor.transform.rotation = Quaternion.FromToRotation(Vector3.up, rHit.normal);
+
+            if (rAnchor != null && OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger)) // btm right anchor creation
+            {
+                Quaternion rotation = Quaternion.LookRotation(-rHit.normal);
+                StartCoroutine(CreateSpatialAnchor(rightAnchorPrefab, rHit.point, rotation, (createdAnchor) =>
+                {
+                    anchorPair.SetRightAnchor(createdAnchor);
+                    anchorPair.SetNormal(MRUK.Instance.GetCurrentRoom().GetFacingDirection(rAnchor));
+                    anchorPair.SetSurfaceType(LabelToInt(rAnchor.Label));
+                    Log($"Check validity of anchor: {createdAnchor.Uuid}");
+                }));
+            }
+        }
+
+        
+
         if (OVRInput.GetDown(OVRInput.Button.One)) // create surface
         {
             CreateSurface();
+            anchorPair.Reset();
         }
 
         if (OVRInput.GetDown(OVRInput.Button.Three)) // reset
@@ -158,6 +231,11 @@ public class SpatialAnchorManager: MonoBehaviour
         isInitialized = true;
     }
 
+    private int LabelToInt(MRUKAnchor.SceneLabels label)
+    {
+        return label == MRUKAnchor.SceneLabels.FLOOR ? AnchorPair.FLOOR : label == MRUKAnchor.SceneLabels.WALL_FACE ? AnchorPair.WALL : -1;
+    }
+
     private void CreateSurface()
     {
         Log("Creating Surface");
@@ -171,11 +249,15 @@ public class SpatialAnchorManager: MonoBehaviour
         Vector3 center = anchorPair.GetCenter();
 
         // Create plane
-        GameObject surface = Instantiate(surfacePrefab, center, Quaternion.identity);
-
+        GameObject surface = Instantiate(anchorPair.label == AnchorPair.WALL ? wallPrefab : floorPrefab, center, Quaternion.identity);
+        
         // Scale the plane
-        surface.transform.localScale = new Vector3(anchorPair.GetWidth(), 10f, anchorPair.GetHeight());
-
+        float width = anchorPair.GetWidth();
+        float height = anchorPair.GetHeight();
+        Log($"Before: LocalScale: {surface.transform.localScale} && Rotation: {surface.transform.rotation}");
+        surface.transform.localScale = new Vector3(width, height, 1);
+        surface.transform.rotation = Quaternion.FromToRotation(Vector3.up, anchorPair.normal);
+        Log($"Width = {width}, Height = {height} => LocalScale: {surface.transform.localScale} && Rotation: {surface.transform.rotation}");
         // TODO
     }
 
