@@ -19,7 +19,7 @@ class AnchorPair
     
     public void SetSurfaceType(int _label)
     {
-        Debug.Log($"HYUNSOO: SetLabel {label}");
+        Debug.Log($"HYUNSOO: SetLabel {_label}");
         if (label == -1)
         {
             label = _label;
@@ -42,12 +42,12 @@ class AnchorPair
 
     public void SetNormal(Vector3 _normal)
     {
-        Debug.Log($"HYUNSOO: SetNormal {normal}");
-        if(normal == Vector3.negativeInfinity)
+        Debug.Log($"HYUNSOO: SetNormal {_normal} vs {normal} vs {Vector3.negativeInfinity} ==> {normal == Vector3.negativeInfinity} vs {normal.Equals(Vector3.negativeInfinity)}");
+        if (normal.Equals(Vector3.negativeInfinity))
         {
             normal = _normal;
         }
-        else if(normal != Vector3.negativeInfinity && normal != _normal)
+        else if(!normal.Equals(Vector3.negativeInfinity) && normal != _normal)
         {
             Debug.Log($"Left and Right anchors have different normal... {normal} != {_normal}");
         }
@@ -55,6 +55,7 @@ class AnchorPair
 
     public void Reset()
     {
+        Debug.Log("HYUNSOO: Reset AnchorPair");
         // TODO
         topLeft = null;
         btmRight = null;
@@ -66,6 +67,15 @@ class AnchorPair
     public Vector3 GetCenter()
     {
         return (topLeft.transform.position + btmRight.transform.position) / 2f; ;
+    }
+
+    public Vector3 GetScale()
+    {
+        var x = Mathf.Abs(topLeft.transform.localPosition.x - btmRight.transform.localPosition.x);
+        var y = Mathf.Abs(topLeft.transform.localPosition.y - btmRight.transform.localPosition.y);
+        var z = Mathf.Abs(topLeft.transform.localPosition.z - btmRight.transform.localPosition.z);
+
+        return new Vector3(x, y, z);
     }
 
     public float GetWidth()
@@ -138,6 +148,7 @@ public class SpatialAnchorManager: MonoBehaviour
     public GameObject rightAnchorPreviewPrefab;
     public GameObject wallPrefab;
     public GameObject floorPrefab;
+    public GameObject cubePrefab;
     public TMP_Text console;
 
     private GameObject leftPreviewAnchor;
@@ -150,6 +161,7 @@ public class SpatialAnchorManager: MonoBehaviour
     void Start()
     {
         anchorPair = new AnchorPair();
+        anchorPair.Reset();
         leftPreviewAnchor = Instantiate(leftAnchorPreviewPrefab);
         rightPreviewAnchor = Instantiate(rightAnchorPreviewPrefab);
     }
@@ -190,7 +202,7 @@ public class SpatialAnchorManager: MonoBehaviour
         if (MRUK.Instance.GetCurrentRoom().Raycast(new Ray(rightRayOrigin, rightRayDirection), float.MaxValue, out RaycastHit rHit, out MRUKAnchor rAnchor))
         {
             rightPreviewAnchor.transform.position = rHit.point;
-            rightPreviewAnchor.transform.rotation = Quaternion.FromToRotation(Vector3.up, rHit.normal);
+            rightPreviewAnchor.transform.rotation = Quaternion.FromToRotation(rHit.normal, Vector3.up);
 
             if (rAnchor != null && OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger)) // btm right anchor creation
             {
@@ -229,6 +241,15 @@ public class SpatialAnchorManager: MonoBehaviour
     {
         Log("Initialized");
         isInitialized = true;
+        var room = MRUK.Instance.GetCurrentRoom();
+        // Visualize normals of all walls and floors
+        foreach (var wall in room.WallAnchors)
+        {
+            // Draw a red line showing the normal direction
+            Debug.DrawRay(wall.GetAnchorCenter(), room.GetFacingDirection(wall) * 0.5f, Color.red);
+        }
+
+        Debug.DrawRay(room.CeilingAnchor.GetAnchorCenter(), room.GetFacingDirection(room.CeilingAnchor) * 0.5f, Color.red);
     }
 
     private int LabelToInt(MRUKAnchor.SceneLabels label)
@@ -249,15 +270,18 @@ public class SpatialAnchorManager: MonoBehaviour
         Vector3 center = anchorPair.GetCenter();
 
         // Create plane
-        GameObject surface = Instantiate(anchorPair.label == AnchorPair.WALL ? wallPrefab : floorPrefab, center, Quaternion.identity);
-        
+        // GameObject surface = Instantiate(anchorPair.label == AnchorPair.WALL ? wallPrefab : floorPrefab, center, Quaternion.identity);
+        GameObject surface = Instantiate(cubePrefab);
+
         // Scale the plane
         float width = anchorPair.GetWidth();
         float height = anchorPair.GetHeight();
-        Log($"Before: LocalScale: {surface.transform.localScale} && Rotation: {surface.transform.rotation}");
-        surface.transform.localScale = new Vector3(width, height, 1);
-        surface.transform.rotation = Quaternion.FromToRotation(Vector3.up, anchorPair.normal);
-        Log($"Width = {width}, Height = {height} => LocalScale: {surface.transform.localScale} && Rotation: {surface.transform.rotation}");
+        Log($"Before: LocalScale: {surface.transform.localScale} && Rotation: {surface.transform.rotation.eulerAngles}");
+        surface.transform.localScale = anchorPair.GetScale(); // new Vector3(width, height, 0.1f);
+        Log($"Before - anchorNormal: {anchorPair.normal} with {anchorPair.label}");
+        surface.transform.rotation = Quaternion.LookRotation(anchorPair.normal);
+        surface.transform.position = anchorPair.GetCenter();
+        Log($"Width = {width}, Height = {height} => LocalScale: {surface.transform.localScale} && Rotation: {surface.transform.rotation.eulerAngles}");
         // TODO
     }
 
@@ -271,7 +295,7 @@ public class SpatialAnchorManager: MonoBehaviour
         // Wait for the async creation
         yield return new WaitUntil(() => anchor.Created);
 
-        Log($"Created anchor {anchor.Uuid}");
+        Log($"Created anchor {anchor.Uuid} at {position}");
 
         //var canvas = anchor.GetComponentInChildren<Canvas>();
         //canvas.gameObject.transform.GetChild(0).GetComponent<TMP_Text>().text = anchor.Uuid.ToString(); // uuid
