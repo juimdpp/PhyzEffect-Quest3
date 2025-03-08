@@ -19,7 +19,6 @@ class AnchorQuad
     }
     public void SetAnchor(OVRSpatialAnchor anchor)
     {
-        Debug.Log("HYUNSOO: setanchor");
         if (anchorList.Count < 4)
         {
             anchorList.Add(anchor);
@@ -29,12 +28,10 @@ class AnchorQuad
         {
             Debug.Log("HYUNSOO: Trying to add too many anchors");
         }
-        Debug.Log("HYUNSOO - setanchor finish");
     }
 
     public void Reset()
     {
-        Debug.Log("HYUNSOO: Reset AnchorPair");
         if (anchorList == null) anchorList = new List<OVRSpatialAnchor>();
         anchorList.Clear();
         if (guidList == null) guidList = new List<Guid>();
@@ -105,8 +102,7 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
                 Quaternion rotation = Quaternion.LookRotation(-lHit.normal);
                 StartCoroutine(CreateSpatialAnchor(anchorPrefab, lHit.point, rotation, (createdAnchor) =>
                 {
-                    anchorQuad.SetAnchor(createdAnchor);
-                    Log($"Check validity of anchor: {createdAnchor.Uuid}");
+                    anchorQuad.SetAnchor(createdAnchor)
                 }));
             }
         }
@@ -141,22 +137,17 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
     private async void LoadSurfaces()
     {
         List<List<Guid>> collection = LoadSurfacesFromText();
-        Log($"HYUNSOO - 2 - {collection} - {collection.Count}");
         
         foreach (var guidList in collection)
         {
-            Log("HYUNSOO - 3");
             await LoadAnchorsByUuid(guidList);
         }
     }
 
     private async Task LoadAnchorsByUuid(List<Guid> guids)
     {
-        Log("HYUNSOO - 4");
         List<OVRSpatialAnchor.UnboundAnchor> _unboundAnchors = new();
-        Log("HYUNSOO - 5");
-        var result = await OVRSpatialAnchor.LoadUnboundAnchorsAsync(guids, _unboundAnchors);
-        Log("HYUNSOO - 6");
+        var result = await OVRSpatialAnchor.LoadUnboundAnchorsAsync(guids, _unboundAnchors)
         if (result.Success)
         {
             Log("Loaded anchors successfully!");
@@ -180,8 +171,7 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"HYUNSOO failed to load unbound anchors {result.Status}");
-            Log("Failed to load unbound anchors");
+            Log($"Failed to load unbound anchors {result.Status}");
         }
         Log("HYUNSOO - 7");
     }
@@ -195,16 +185,13 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
             return;
         }
         GameObject surface = CreateQuad(0.4f, 0.8f);
-        Log($"Before mySurfaces count - {mySurfaces.Count}");
         var cpy = CopyAnchorQuad(anchorQuad);
         mySurfaces.Add(cpy);
-        Log($"After mySurfaces count - {mySurfaces.Count}");
-        Log($"Created Surface - anchorQuad number of anchors: {anchorQuad.anchorList.Count}");
+        Log($"Created Surface");
     }
 
     private AnchorQuad CopyAnchorQuad(AnchorQuad src)
     {
-        Log($"CopyAnchorQuad - {src.anchorList.Count} - {src.guidList.Count}");
         AnchorQuad dst = new AnchorQuad();
         for(int i=0; i<src.anchorList.Count; i++)
         {
@@ -216,7 +203,6 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
 
     private GameObject CreateQuad(float width, float height)
     {
-        Log("CreateQuad");
         GameObject obj = new GameObject();
         MeshRenderer meshRenderer = obj.AddComponent<MeshRenderer>();
         meshRenderer.sharedMaterial = color;
@@ -248,14 +234,13 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
         meshRenderer.material = color; // Apply a default material
 
         obj.AddComponent<MeshCollider>();
-        Log("CreatedQuad");
+        Log("Created Quad");
         return obj;
     }
 
 
     private IEnumerator CreateSpatialAnchor(GameObject anchorPrefab, Vector3 position, Quaternion rotation, Action<OVRSpatialAnchor> callback)
     {
-        Log("Creating anchor");
         GameObject prefab = Instantiate(anchorPrefab, position, rotation);
         var anchor = prefab.AddComponent<OVRSpatialAnchor>();
 
@@ -274,28 +259,20 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
 
     private async void SaveAllSurfaces()
     {
-        Log("1. Saving surfaces");
         List<List<string>> surfaceCollection = new List<List<string>>();
-        Log($"2 - {mySurfaces.Count}");
         for(int i=0; i<mySurfaces.Count; i++)
         {
             // Save the anchors
-            Log($"2-1 {mySurfaces[i].anchorList.Count}");
             await SaveSurfaceAnchors(mySurfaces[i].anchorList);
 
             // Then save each surface as JSON
             surfaceCollection.Add(mySurfaces[i].guidList.ConvertAll(g => g.ToString()));
-
-            Log("5. Added to collection");
         }
-        Log("6 - finish iteration");
         SaveSurfacesAsText(surfaceCollection);
-        Log("Saved surfaces to TEXT.");
     }
 
     private async Task SaveSurfaceAnchors(List<OVRSpatialAnchor> anchors)
     {
-        Log("3 - savesurfacaeanchors");
         var result = await OVRSpatialAnchor.SaveAnchorsAsync(anchors);
         if (result.Success)
         {
@@ -303,7 +280,7 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
         }
         else
         {
-            LogError($"4. Failed to save {anchors.Count} anchor(s) with error {result.Status}");
+            LogError($"Failed to save {anchors.Count} anchor(s) with error {result.Status}");
         }
     }
 
