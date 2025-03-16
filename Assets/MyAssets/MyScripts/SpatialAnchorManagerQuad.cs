@@ -102,7 +102,7 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
                 Quaternion rotation = Quaternion.LookRotation(-lHit.normal);
                 StartCoroutine(CreateSpatialAnchor(anchorPrefab, lHit.point, rotation, (createdAnchor) =>
                 {
-                    anchorQuad.SetAnchor(createdAnchor)
+                    anchorQuad.SetAnchor(createdAnchor);
                 }));
             }
         }
@@ -147,7 +147,7 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
     private async Task LoadAnchorsByUuid(List<Guid> guids)
     {
         List<OVRSpatialAnchor.UnboundAnchor> _unboundAnchors = new();
-        var result = await OVRSpatialAnchor.LoadUnboundAnchorsAsync(guids, _unboundAnchors)
+        var result = await OVRSpatialAnchor.LoadUnboundAnchorsAsync(guids, _unboundAnchors);
         if (result.Success)
         {
             Log("Loaded anchors successfully!");
