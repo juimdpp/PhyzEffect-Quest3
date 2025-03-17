@@ -64,13 +64,19 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
 {
     public GameObject anchorPrefab;
     public GameObject anchorPreviewPrefab;
+    public GameObject meshAnchorPrefab;
+    public GameObject meshAnchorPreviewPrefab;
+    public GameObject meshPrefab;
     public TMP_Text console;
     public Material color;
 
     private GameObject previewAnchor;
+    private GameObject meshPreviewAnchor;
+    private GameObject meshObject;
     private bool isInitialized = false;
     private List<AnchorQuad> mySurfaces;
     private AnchorQuad anchorQuad;
+    private AnchorQuad meshAnchorQuad;
     private string textPath = "";
 
     // Start is called before the first frame update
@@ -81,6 +87,10 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
         previewAnchor = Instantiate(anchorPreviewPrefab);
         mySurfaces = new List<AnchorQuad>();
         textPath = Application.persistentDataPath + "/savedSurfaces.txt";
+
+        meshPreviewAnchor = Instantiate(meshAnchorPreviewPrefab);
+        meshAnchorQuad = new AnchorQuad();
+        meshAnchorQuad.Reset();
     }
 
     // Update is called once per frame
@@ -113,6 +123,32 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
             anchorQuad.Reset();
         }
 
+
+        // Create Ray
+        Vector3 rightRayOrigin = OVRInput.GetLocalControllerPosition(OVRInput.Controller.RTouch);
+        Vector3 rightRayDirection = OVRInput.GetLocalControllerRotation(OVRInput.Controller.RTouch) * Vector3.forward;
+
+        // Check if it intersects with Scene API elements
+        if (MRUK.Instance.GetCurrentRoom().Raycast(new Ray(rightRayOrigin, rightRayDirection), float.MaxValue, out RaycastHit rHit, out MRUKAnchor rAnchor))
+        {
+            meshPreviewAnchor.transform.position = rHit.point;
+            meshPreviewAnchor.transform.rotation = Quaternion.FromToRotation(Vector3.up, rHit.normal);
+            if (rAnchor != null && OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger)) // MUST CREATE IN THIS ORDER: bottom left -> bottom right -> top left -> top right
+            {
+                Quaternion rotation = Quaternion.LookRotation(-rHit.normal);
+                StartCoroutine(CreateSpatialAnchor(meshAnchorPrefab, rHit.point, rotation, (createdAnchor) =>
+                {
+                    meshAnchorQuad.SetAnchor(createdAnchor);
+                }));
+            }
+        }
+        if (OVRInput.GetDown(OVRInput.Button.Two)) // create mesh
+        {
+            ResizeAndPositionMesh();
+            meshAnchorQuad.Reset();
+        }
+
+
         if (OVRInput.GetDown(OVRInput.Button.Three)) // save all surfaces
         {
             SaveAllSurfaces();
@@ -134,6 +170,73 @@ public class SpatialAnchorManagerQuad : MonoBehaviour
         LoadSurfaces();
     }
 
+    private void ResizeAndPositionMesh()
+    {
+        Log("ResizeAndPositionMesh");
+        if(meshAnchorQuad.anchorList.Count != 3)
+        {
+            LogError("Too many or too few anchors to create and resize mesh");
+            return;
+        }
+        meshObject = Instantiate(meshPrefab);
+
+        Log(meshObject.transform.GetChild(0).childCount + "Child count for meshObject");
+
+        GameObject RefCube1 = meshAnchorQuad.anchorList[0].gameObject;
+        GameObject RefCube2 = meshAnchorQuad.anchorList[1].gameObject;
+        GameObject RefCube3 = meshAnchorQuad.anchorList[2].gameObject;
+        Log("1");
+        GameObject DeskCube1 = meshObject.transform.GetChild(0).GetChild(0).gameObject;
+        GameObject DeskCube2 = meshObject.transform.GetChild(0).GetChild(1).gameObject;
+        GameObject DeskCube3 = meshObject.transform.GetChild(0).GetChild(2).gameObject;
+        Log("2");
+        RefCube1.GetComponentInChildren<MeshRenderer>().material.SetColor("_BaseColor", Color.red);
+        RefCube2.GetComponentInChildren<MeshRenderer>().material.SetColor("_BaseColor", Color.green);
+        RefCube3.GetComponentInChildren<MeshRenderer>().material.SetColor("_BaseColor", Color.blue);
+        Log("2-2");
+        DeskCube1.GetComponentInChildren<MeshRenderer>().material.SetColor("_BaseColor", Color.red);
+        DeskCube2.GetComponentInChildren<MeshRenderer>().material.SetColor("_BaseColor", Color.green);
+        DeskCube3.GetComponentInChildren<MeshRenderer>().material.SetColor("_BaseColor", Color.blue);
+
+        Log("3");
+        Vector3 RefPos1 = RefCube1.GetComponent<Transform>().position;
+        Vector3 RefPos2 = RefCube2.GetComponent<Transform>().position;
+        Vector3 RefPos3 = RefCube3.GetComponent<Transform>().position;
+        Log("4");
+        Vector3 DeskPos1 = DeskCube1.GetComponent<Transform>().position;
+        Vector3 DeskPos2 = DeskCube2.GetComponent<Transform>().position;
+        Vector3 DeskPos3 = DeskCube3.GetComponent<Transform>().position;
+        Log("5");
+        // Match scale
+        float refWidth = Mathf.Abs(RefPos1.x - RefPos2.x);
+        float refHeight = Mathf.Abs(RefPos1.y - RefPos3.y);
+        float refDepth = Mathf.Abs(RefPos1.z - RefPos3.z);
+        float deskWidth = Mathf.Abs(DeskPos1.x - DeskPos2.x);
+        float deskHeight = Mathf.Abs(DeskPos1.y - DeskPos3.y);
+        float deskDepth = Mathf.Abs(DeskPos1.z - DeskPos3.z);
+
+        Log(refWidth + ", " + refHeight + ", " + refDepth);
+        Log(deskWidth + ", " + deskHeight + ", " + deskDepth);
+
+
+        meshObject.transform.localScale = new Vector3(refWidth / deskWidth, refHeight / deskHeight, refDepth / deskDepth);
+
+        // Update position to the middle cube, but put it a bit in front and on top. Define bit as half the size of the arucoMarker (one of the RefCubes)
+        meshObject.transform.position = RefPos1;
+
+        Log("Position: " + RefPos1);
+
+        // Compute direction vectors
+        Vector3 refDirection = (RefPos2 - RefPos1).normalized;  // Desired direction
+        Vector3 deskDirection = (DeskPos2 - DeskPos1).normalized;  // Current direction
+
+        // Compute rotation needed to align deskDirection with refDirection
+        Quaternion rotationCorrection = Quaternion.FromToRotation(deskDirection, refDirection);
+
+        // Apply the rotation while keeping DeskCube1 fixed
+        meshObject.transform.rotation = rotationCorrection * meshObject.transform.rotation;
+
+    }
     private async void LoadSurfaces()
     {
         List<List<Guid>> collection = LoadSurfacesFromText();
