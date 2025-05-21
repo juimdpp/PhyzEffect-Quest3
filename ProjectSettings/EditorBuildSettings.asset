@@ -17,7 +17,7 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/MyAssets/MyScenes/SpatialAnchorSample.unity
     guid: 7c80c1367bbed16409d82c5d61988b0f
-  - enabled: 1
+  - enabled: 0
     path: Assets/MyAssets/MyScenes/SceneAligner.unity
     guid: 60965a7658c29b648ba6a5aebf8b5124
   - enabled: 0
@@ -26,6 +26,12 @@ EditorBuildSettings:
   - enabled: 0
     path: "Assets/Samples/Meta XR Interaction \u200BSDK/72.0.0/Example Scenes/RayExamples.unity"
     guid: 1b2d3f90c0f50b94cb910c66c773d00d
+  - enabled: 1
+    path: Assets/MyAssets/MyScenes/Bin It!.unity
+    guid: e2c9660cd3be98f4592c50ae13e6f6b5
+  - enabled: 0
+    path: Assets/MyAssets/MyScenes/RayExamples 1.unity
+    guid: 8055e949708f16c4fb11f4f8868a568f
   m_configObjects:
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 34ef34a4b35d2634686dda53afd684c6,
       type: 2}
