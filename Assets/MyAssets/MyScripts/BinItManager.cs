@@ -146,23 +146,15 @@ public class BinItManager : MonoBehaviour
 
         else // PlayMode
         {
-            // Can Throw
-            Vector3 rightRayOrigin = OVRInput.GetLocalControllerPosition(OVRInput.Controller.RTouch);
-            Vector3 rightRayDirection = OVRInput.GetLocalControllerRotation(OVRInput.Controller.RTouch) * Vector3.forward;
-
-            // Check if it intersects with Scene API elements
-            if (MRUK.Instance.GetCurrentRoom().Raycast(new Ray(rightRayOrigin, rightRayDirection), float.MaxValue, out RaycastHit rHit, out MRUKAnchor rAnchor))
+            // TODO: throw instead of shoot
+            if (OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger))
             {
-                meshPreviewAnchor.transform.position = rHit.point;
-                meshPreviewAnchor.transform.rotation = Quaternion.FromToRotation(Vector3.up, rHit.normal);
-                if (rAnchor != null && OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger)) // MUST CREATE IN THIS ORDER: bottom left -> bottom right -> top left -> top right
-                {
-                    Quaternion rotation = Quaternion.LookRotation(-rHit.normal);
-                    StartCoroutine(CreateSpatialAnchor(meshAnchorPrefab, rHit.point, rotation, (createdAnchor) =>
-                    {
-                        meshAnchorQuad2.AddAnchor(createdAnchor);
-                    }));
-                }
+                GameObject ball = Instantiate(meshAnchorPrefab, OVRInput.GetLocalControllerPosition(OVRInput.Controller.RTouch), OVRInput.GetLocalControllerRotation(OVRInput.Controller.RTouch));
+                Rigidbody rb = ball.GetComponent<Rigidbody>();
+                Vector3 throwDirection = OVRInput.GetLocalControllerRotation(OVRInput.Controller.RTouch) * Vector3.forward;
+                rb.AddForce(throwDirection * 5f, ForceMode.VelocityChange);
+                rb.useGravity = true;
+                rb.isKinematic = false
             }
         }
 
