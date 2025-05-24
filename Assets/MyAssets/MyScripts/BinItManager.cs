@@ -7,17 +7,17 @@ using TMPro;
 using System;
 using System.IO;
 
-class AnchorQuad2
+class AnchorList
 {
     public List<OVRSpatialAnchor> anchorList;
     public List<Guid> guidList;
 
-    public AnchorQuad2()
+    public AnchorList()
     {
         anchorList = new List<OVRSpatialAnchor>();
         guidList = new List<Guid>();
     }
-    public void SetAnchor(OVRSpatialAnchor anchor)
+    public void AddAnchor(OVRSpatialAnchor anchor)
     {
         if (anchorList.Count < 4)
         {
@@ -77,29 +77,36 @@ public class BinItManager : MonoBehaviour
     private GameObject meshPreviewAnchor;
     private GameObject meshObject;
     private bool isInitialized = false;
-    private List<AnchorQuad2> mySurfaces;
-    private AnchorQuad2 AnchorQuad2;
-    private AnchorQuad2 meshAnchorQuad2;
+    private List<AnchorList> mySurfaces;
+    private AnchorList MyAnchorList;
+    private AnchorList meshAnchorQuad2;
     private string textPath = "";
+
+    private enum PlayModes
+    {
+        EditPositionMode,
+        PlayMode
+    };
+    private PlayModes currMode;
 
     // Start is called before the first frame update
     void Start()
     {
         visualizer.isMenuVisible = false;
 
-        AnchorQuad2 = new AnchorQuad2();
-        AnchorQuad2.Reset();
+        MyAnchorList = new AnchorList();
+        MyAnchorList.Reset();
 
         anchorPreviewPrefab.transform.localScale = new Vector3(scale, scale, scale);
         anchorPrefab.transform.localScale = new Vector3(scale, scale, scale);
         previewAnchor = Instantiate(anchorPreviewPrefab);
         
 
-        mySurfaces = new List<AnchorQuad2>();
+        mySurfaces = new List<AnchorList>();
         textPath = Application.persistentDataPath + "/savedSurfaces.txt";
 
         meshPreviewAnchor = Instantiate(meshAnchorPreviewPrefab);
-        meshAnchorQuad2 = new AnchorQuad2();
+        meshAnchorQuad2 = new AnchorList();
         meshAnchorQuad2.Reset();
 
         Renderer renderer = previewAnchor.GetComponentInChildren<Renderer>();
@@ -117,65 +124,59 @@ public class BinItManager : MonoBehaviour
 
         if (visualizer.isMenuVisible) return;
 
-        // Create Ray
-        Vector3 leftRayOrigin = OVRInput.GetLocalControllerPosition(OVRInput.Controller.LTouch);
-        Vector3 leftRayDirection = OVRInput.GetLocalControllerRotation(OVRInput.Controller.LTouch) * Vector3.forward;
-
-        // Check if it intersects with Scene API elements
-        if (MRUK.Instance.GetCurrentRoom().Raycast(new Ray(leftRayOrigin, leftRayDirection), float.MaxValue, out RaycastHit lHit, out MRUKAnchor lAnchor))
+        if (currMode == PlayModes.EditPositionMode)
         {
-            previewAnchor.transform.position = lHit.point + lHit.normal * (objectHeight / 2f);
-            previewAnchor.transform.rotation = Quaternion.FromToRotation(Vector3.up, lHit.normal);
-            if (lAnchor != null && OVRInput.GetDown(OVRInput.Button.PrimaryIndexTrigger)) // MUST CREATE IN THIS ORDER: bottom left -> bottom right -> top left -> top right
+
+            // Create Ray
+            Vector3 leftRayOrigin = OVRInput.GetLocalControllerPosition(OVRInput.Controller.LTouch);
+            Vector3 leftRayDirection = OVRInput.GetLocalControllerRotation(OVRInput.Controller.LTouch) * Vector3.forward;
+
+            // Check if it intersects with Scene API elements
+            if (MRUK.Instance.GetCurrentRoom().Raycast(new Ray(leftRayOrigin, leftRayDirection), float.MaxValue, out RaycastHit lHit, out MRUKAnchor lAnchor))
             {
-                Quaternion rotation = Quaternion.identity; // Quaternion.LookRotation(-lHit.normal);
-                StartCoroutine(CreateSpatialAnchor(anchorPrefab, lHit.point + lHit.normal * (objectHeight / 2f), rotation, (createdAnchor) =>
+                previewAnchor.transform.position = lHit.point + lHit.normal * (objectHeight / 2f);
+                previewAnchor.transform.rotation = Quaternion.FromToRotation(Vector3.up, lHit.normal);
+                if (lAnchor != null && OVRInput.GetDown(OVRInput.Button.PrimaryIndexTrigger)) // MUST CREATE IN THIS ORDER: bottom left -> bottom right -> top left -> top right
                 {
-                    AnchorQuad2.SetAnchor(createdAnchor);
-                }));
+                    Quaternion rotation = Quaternion.identity; // Quaternion.LookRotation(-lHit.normal);
+                    StartCoroutine(CreateSpatialAnchor(anchorPrefab, lHit.point + lHit.normal * (objectHeight / 2f), rotation, (createdAnchor) =>
+                    {
+                        MyAnchorList.AddAnchor(createdAnchor);
+                    }));
+                }
+            }
+
+            if (OVRInput.GetDown(OVRInput.Button.Three)) // save all bins
+            {
+                SaveAllSurfaces();
+            }
+
+            if (OVRInput.GetDown(OVRInput.Button.Four)) // erase most recent bin
+            {
+                MyAnchorList.EraseRecentAnchor();
             }
         }
 
-        if (OVRInput.GetDown(OVRInput.Button.One)) // create surface
+        else // PlayMode
         {
-            CreateSurface();
-            AnchorQuad2.Reset();
-        }
+            // Can Throw
+            Vector3 rightRayOrigin = OVRInput.GetLocalControllerPosition(OVRInput.Controller.RTouch);
+            Vector3 rightRayDirection = OVRInput.GetLocalControllerRotation(OVRInput.Controller.RTouch) * Vector3.forward;
 
-
-        // Create Ray
-        Vector3 rightRayOrigin = OVRInput.GetLocalControllerPosition(OVRInput.Controller.RTouch);
-        Vector3 rightRayDirection = OVRInput.GetLocalControllerRotation(OVRInput.Controller.RTouch) * Vector3.forward;
-
-        // Check if it intersects with Scene API elements
-        if (MRUK.Instance.GetCurrentRoom().Raycast(new Ray(rightRayOrigin, rightRayDirection), float.MaxValue, out RaycastHit rHit, out MRUKAnchor rAnchor))
-        {
-            meshPreviewAnchor.transform.position = rHit.point;
-            meshPreviewAnchor.transform.rotation = Quaternion.FromToRotation(Vector3.up, rHit.normal);
-            if (rAnchor != null && OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger)) // MUST CREATE IN THIS ORDER: bottom left -> bottom right -> top left -> top right
+            // Check if it intersects with Scene API elements
+            if (MRUK.Instance.GetCurrentRoom().Raycast(new Ray(rightRayOrigin, rightRayDirection), float.MaxValue, out RaycastHit rHit, out MRUKAnchor rAnchor))
             {
-                Quaternion rotation = Quaternion.LookRotation(-rHit.normal);
-                StartCoroutine(CreateSpatialAnchor(meshAnchorPrefab, rHit.point, rotation, (createdAnchor) =>
+                meshPreviewAnchor.transform.position = rHit.point;
+                meshPreviewAnchor.transform.rotation = Quaternion.FromToRotation(Vector3.up, rHit.normal);
+                if (rAnchor != null && OVRInput.GetDown(OVRInput.Button.SecondaryIndexTrigger)) // MUST CREATE IN THIS ORDER: bottom left -> bottom right -> top left -> top right
                 {
-                    meshAnchorQuad2.SetAnchor(createdAnchor);
-                }));
+                    Quaternion rotation = Quaternion.LookRotation(-rHit.normal);
+                    StartCoroutine(CreateSpatialAnchor(meshAnchorPrefab, rHit.point, rotation, (createdAnchor) =>
+                    {
+                        meshAnchorQuad2.AddAnchor(createdAnchor);
+                    }));
+                }
             }
-        }
-        if (OVRInput.GetDown(OVRInput.Button.Two)) // create mesh
-        {
-            ResizeAndPositionMesh();
-            meshAnchorQuad2.Reset();
-        }
-
-
-        if (OVRInput.GetDown(OVRInput.Button.Three)) // save all surfaces
-        {
-            SaveAllSurfaces();
-        }
-
-        if (OVRInput.GetDown(OVRInput.Button.Four)) // erase most recent
-        {
-            AnchorQuad2.EraseRecentAnchor();
         }
 
     }
@@ -300,21 +301,21 @@ public class BinItManager : MonoBehaviour
 
     private void CreateSurface()
     {
-        Log($"Creating Surface - AnchorQuad2 number of anchors: {AnchorQuad2.anchorList.Count}");
-        if (!AnchorQuad2.isValid())
+        Log($"Creating Surface - AnchorQuad2 number of anchors: {MyAnchorList.anchorList.Count}");
+        if (!MyAnchorList.isValid())
         {
-            Log($"Number of anchors is not four! {AnchorQuad2.anchorList.Count}");
+            Log($"Number of anchors is not four! {MyAnchorList.anchorList.Count}");
             return;
         }
         GameObject surface = CreateQuad(0.4f, 0.8f);
-        var cpy = CopyAnchorQuad2(AnchorQuad2);
+        var cpy = CopyAnchorQuad2(MyAnchorList);
         mySurfaces.Add(cpy);
         Log($"Created Surface");
     }
 
-    private AnchorQuad2 CopyAnchorQuad2(AnchorQuad2 src)
+    private AnchorList CopyAnchorQuad2(AnchorList src)
     {
-        AnchorQuad2 dst = new AnchorQuad2();
+        AnchorList dst = new AnchorList();
         for(int i=0; i<src.anchorList.Count; i++)
         {
             dst.anchorList.Add(src.anchorList[i]);
@@ -336,7 +337,7 @@ public class BinItManager : MonoBehaviour
         
         Vector3[] vertices = new Vector3[4];
         int idx = 0;
-        AnchorQuad2.anchorList.ForEach(anchor =>
+        MyAnchorList.anchorList.ForEach(anchor =>
         {
             vertices[idx++] = anchor.transform.position;
             Log($"vertex {idx}th = {anchor.transform.position}");
@@ -467,15 +468,20 @@ public class BinItManager : MonoBehaviour
     public void PositionBins()
     {
         Log("PositionBins clicked");
+        currMode = PlayModes.EditPositionMode;
     }
     public void BringSavedBins()
     {
         Log("BringSavedBins clicked");
+        currMode = PlayModes.PlayMode;
+        // TODO: trigger LoadSavedBins
     }
 
     public void RandomBins()
     {
         Log("RandomBins clicked");
+        currMode = PlayModes.PlayMode;
+        // TODO: trigger randomPositionBins
     }
 
 
