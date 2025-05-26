@@ -152,9 +152,9 @@ public class BinItManager : MonoBehaviour
                 GameObject ball = Instantiate(meshAnchorPrefab, OVRInput.GetLocalControllerPosition(OVRInput.Controller.RTouch), OVRInput.GetLocalControllerRotation(OVRInput.Controller.RTouch));
                 Rigidbody rb = ball.GetComponent<Rigidbody>();
                 Vector3 throwDirection = OVRInput.GetLocalControllerRotation(OVRInput.Controller.RTouch) * Vector3.forward;
-                rb.AddForce(throwDirection * 5f, ForceMode.VelocityChange);
+                rb.velocity = ball.transform.forward * 5f;
                 rb.useGravity = true;
-                rb.isKinematic = false
+                rb.isKinematic = false;
             }
         }
 
