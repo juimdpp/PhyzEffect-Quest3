@@ -3,6 +3,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 
+public enum ObjectTypes
+{
+    SOFA,
+    CARPET,
+    YOGA
+}
 public class Visualizer : MonoBehaviour
 {
     public GameObject MenuCanvas;
@@ -11,12 +17,14 @@ public class Visualizer : MonoBehaviour
     public bool isMenuVisible;
 
     public TMP_Text text;
+    public TMP_Dropdown objectType;
 
     // Start is called before the first frame update
     void Start()
     {
         isMenuVisible = false;
         MenuCanvas.SetActive(isMenuVisible);
+        objectType.AddOptions(new List<string>(System.Enum.GetNames(typeof(ObjectTypes))));
     }
 
     // Update is called once per frame
