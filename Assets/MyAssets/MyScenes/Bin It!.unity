@@ -21181,7 +21181,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1615006007}
         m_TargetAssemblyTypeName: BinItManager, Assembly-CSharp
-        m_MethodName: DigitalTwin
+        m_MethodName: MakeDigitalTwin
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}

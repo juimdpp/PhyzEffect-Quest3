@@ -179,11 +179,13 @@ public class BinItManager : MonoBehaviour
                         break;
                     case (ObjectTypes.CARPET):
                         Log("CARPET");
+                        CreateSurface(objectAnchorQuad);
                         SaveAnchorList(objectAnchorQuad, ObjectTypes.CARPET.ToString());
                         objectAnchorQuad.Reset();
                         break;
                     case (ObjectTypes.YOGA):
                         Log("YOGA");
+                        CreateSurface(objectAnchorQuad);
                         SaveAnchorList(objectAnchorQuad, ObjectTypes.YOGA.ToString());
                         objectAnchorQuad.Reset();
                         break;
@@ -213,6 +215,55 @@ public class BinItManager : MonoBehaviour
         }
 
     }
+
+    private void CreateSurface(AnchorList anchorQuad)
+    {
+        if (anchorQuad.anchorList.Count != 4)
+        {
+            Log($"Number of anchors is not four! {anchorQuad.anchorList.Count}");
+            return;
+        }
+        GameObject surface = CreateQuad(anchorQuad, 0.4f, 0.8f);
+        Log($"Created Surface");
+    }
+
+    private GameObject CreateQuad(AnchorList anchorQuad, float width, float height)
+    {
+        GameObject obj = new GameObject();
+        MeshRenderer meshRenderer = obj.AddComponent<MeshRenderer>();
+        meshRenderer.sharedMaterial = color;
+
+        MeshFilter meshFilter = obj.AddComponent<MeshFilter>();
+
+        Mesh mesh = new Mesh();
+
+
+        Vector3[] vertices = new Vector3[4];
+        int idx = 0;
+        anchorQuad.anchorList.ForEach(anchor =>
+        {
+            vertices[idx++] = anchor.transform.position;
+            Log($"vertex {idx}th = {anchor.transform.position}");
+        });
+
+        mesh.vertices = vertices;
+
+
+        mesh.triangles = new int[]
+        {
+            0, 2, 1, // First triangle
+            2, 3, 1  // Second triangle
+        };
+
+        mesh.RecalculateNormals();
+        meshFilter.mesh = mesh;
+        meshRenderer.material = color; // Apply a default material
+
+        obj.AddComponent<MeshCollider>();
+        Log("Created Quad");
+        return obj;
+    }
+
 
     public void Initialized()
     {
@@ -443,10 +494,15 @@ public class BinItManager : MonoBehaviour
         currMode = PlayModes.PlayMode;
         // TODO: trigger randomPositionBins
     }
-    public void DigitalTwin()
+    public void MakeDigitalTwin()
     {
-        Log("DigitalTwin mode activated");
+        Log("DigitalTwin creation mode activated");
         currMode = PlayModes.DigitalTwinMode;
+    }
+    public void LoadDigitalTwin()
+    {
+        Log("DigitalTwin loaded");
+        // TODO
     }
 
 
